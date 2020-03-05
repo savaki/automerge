@@ -3,7 +3,35 @@ automerge-go
 
 `automerge-go` is an experiment in Go of implementing columnar automerge as described by Martin Kleppman ([columnar experiment writeup](https://github.com/automerge/automerge-perf/tree/master/columnar)).
 
+*** THIS NON-FUNCTIONAL CODE ***
+
 While the code will be functional at some point, the current intent of the code is to understand the performance characteristics of columnar automerge.
+
+# Current Performance
+
+Run from mac pro desktop.
+
+```text
+=== RUN   TestPerformance
+applying edits ...
+ 25000:  62388 bytes, 3.1 µs/op
+ 50000: 126464 bytes, 3.1 µs/op
+ 75000: 189055 bytes, 4.2 µs/op
+100000: 252513 bytes, 3.5 µs/op
+125000: 314784 bytes, 2.9 µs/op
+150000: 376359 bytes, 7.2 µs/op
+175000: 439171 bytes, 3.5 µs/op
+200000: 502771 bytes, 6.7 µs/op
+225000: 569985 bytes, 7.5 µs/op
+250000: 634307 bytes, 4.1 µs/op
+
+edits -> 259778
+bytes -> 659432
+pages -> 5056
+--- PASS: TestPerformance (1.52s)
+``` 
+
+
 
 # General Concepts
 
