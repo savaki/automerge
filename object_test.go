@@ -25,7 +25,7 @@ func TestNode_Insert(t *testing.T) {
 	const n = 1e4
 
 	me := []byte("me")
-	node := NewNode(encoding.RawTypeVarInt)
+	node := NewObject(encoding.RawTypeVarInt)
 	for i := int64(0); i < n; i++ {
 		op := Op{
 			OpCounter:  i + 1,

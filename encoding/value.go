@@ -121,6 +121,7 @@ func ReadValue(rawType RawType, buffer []byte) (Value, error) {
 	}
 }
 
+// ByteSliceValue encodes to a var int length followed by the bytes
 func ByteSliceValue(data []byte) Value {
 	_, length := putVarInt(int64(len(data)))
 
@@ -131,6 +132,7 @@ func ByteSliceValue(data []byte) Value {
 	}
 }
 
+// Int64Value encodes to var int value
 func Int64Value(v int64) Value {
 	return Value{
 		Int:     v,
@@ -138,6 +140,7 @@ func Int64Value(v int64) Value {
 	}
 }
 
+// RuneValue encodes var int value
 func RuneValue(r rune) Value {
 	return Value{
 		Int:     int64(r),
@@ -145,6 +148,15 @@ func RuneValue(r rune) Value {
 	}
 }
 
+// PropertyValue encodes to:
+// * var int total length
+// * var int key length
+// * key bytes
+// * var int value length
+// * value bytes
+//
+// While we could remove total length at the top, this would require a new raw format.
+// Instead, we'll take the var int hit to allow us to encode the property as a byte slice.
 func PropertyValue(key int64, value []byte) Value {
 	kb, kn := putVarInt(key)
 	vb, vn := putVarInt(int64(len(value)))
@@ -155,6 +167,7 @@ func PropertyValue(key int64, value []byte) Value {
 	return ByteSliceValue(data)
 }
 
+// StringValue encodes to a var int length followed by a byte array
 func StringValue(s string) Value {
 	return ByteSliceValue([]byte(s))
 }

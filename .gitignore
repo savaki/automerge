@@ -8,4 +8,9 @@
 # ignore generated files
 #
 go.sum
+node_modules
+package-lock.json
+*.js
+*.json
+
 
