@@ -77,7 +77,7 @@ As the changes of repetition get longer, `delta_rle` compression gets better.  F
 * int64
 * key value pair
 
-Underneath the logical data type is a raw data type, currently only varint and byte array.
+Underneath the logical data type is a raw data type, currently only varint and byte array.  varints are stored using a dynamic number of bytes in the same manner that protobuf uses.  byte arrays are stored as a varint that represents the length of the byte array followed by the bytes.
 
 ### dictionary_rle
 
