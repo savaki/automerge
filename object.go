@@ -26,7 +26,7 @@ const (
 )
 
 type objectOptions struct {
-	maxPageSize int
+	maxPageSize int64
 }
 
 // Object encapsulates a logical object within the document e.g. a Text block, an Object, an Array, etc
@@ -50,7 +50,7 @@ func makeObjectOptions(opts ...ObjectOption) objectOptions {
 type ObjectOption func(*objectOptions)
 
 // WithMaxPageSize defines maximum number of records contained in a single page
-func WithMaxPageSize(n int) ObjectOption {
+func WithMaxPageSize(n int64) ObjectOption {
 	return func(o *objectOptions) {
 		if n <= 0 {
 			return
@@ -98,7 +98,7 @@ func (o *Object) Insert(op Op) error {
 	}
 
 	if page.rowCount > o.options.maxPageSize {
-		left, right, err := page.SplitAt(int64(o.options.maxPageSize) / 2)
+		left, right, err := page.SplitAt(o.options.maxPageSize / 2)
 		if err != nil {
 			return fmt.Errorf("unable to insert record: failed to split page at index, %v: %w", 600, err)
 		}

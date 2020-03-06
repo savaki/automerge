@@ -37,7 +37,7 @@ type Page struct {
 	value      *encoding.Plain
 
 	filter   *bloom.BloomFilter
-	rowCount int
+	rowCount int64
 }
 
 type IDToken struct {
@@ -164,11 +164,11 @@ func (p *Page) InsertAt(index int64, op Op) error {
 func (p *Page) SplitAt(index int64) (left, right *Page, err error) {
 	lp := &Page{
 		filter:   bloom.New(bloomM, bloomK),
-		rowCount: int(index),
+		rowCount: index,
 	}
 	rp := &Page{
 		filter:   bloom.New(bloomM, bloomK),
-		rowCount: p.rowCount - int(index),
+		rowCount: p.rowCount - index,
 	}
 
 	{
