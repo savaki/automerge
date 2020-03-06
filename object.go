@@ -15,30 +15,46 @@
 package automerge
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/savaki/automerge/encoding"
+	"github.com/willf/bloom"
 )
 
 const (
 	defaultRowCount = 100
+	defaultBloomM   = 15000
+	defaultBloomK   = 8
 )
 
+type bloomOptions struct {
+	M uint
+	K uint
+}
+
 type objectOptions struct {
-	maxPageSize int64
+	Bloom       bloomOptions
+	MaxPageSize int64
 }
 
 // Object encapsulates a logical object within the document e.g. a Text block, an Object, an Array, etc
 type Object struct {
 	options objectOptions
 	pages   []*Page
+	filters []*bloom.BloomFilter
 	rawType encoding.RawType
 }
 
 func makeObjectOptions(opts ...ObjectOption) objectOptions {
 	options := objectOptions{
-		maxPageSize: defaultRowCount,
+		Bloom: bloomOptions{
+			M: defaultBloomM,
+			K: defaultBloomK,
+		},
+		MaxPageSize: defaultRowCount,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -55,15 +71,30 @@ func WithMaxPageSize(n int64) ObjectOption {
 		if n <= 0 {
 			return
 		}
-		o.maxPageSize = n
+		o.MaxPageSize = n
+	}
+}
+
+func WithBloomOptions(m, k uint) ObjectOption {
+	return func(o *objectOptions) {
+		if m <= 0 || k <= 0 {
+			return
+		}
+		o.Bloom = bloomOptions{
+			M: m,
+			K: k,
+		}
 	}
 }
 
 // NewObject returns a new object whose value is of RawType using the options provided
-func NewObject(rawType encoding.RawType, options ...ObjectOption) *Object {
+func NewObject(rawType encoding.RawType, opts ...ObjectOption) *Object {
+	options := makeObjectOptions(opts...)
+	filter, _ := makeBloomFilter(options.Bloom, nil)
 	return &Object{
-		options: makeObjectOptions(options...),
+		options: options,
 		pages:   []*Page{NewPage(rawType)},
+		filters: []*bloom.BloomFilter{filter},
 		rawType: rawType,
 	}
 }
@@ -71,11 +102,11 @@ func NewObject(rawType encoding.RawType, options ...ObjectOption) *Object {
 func (o *Object) findPage(counter int64, actor []byte) (int, int64, error) {
 	key := makeBloomKey(counter, actor)
 	for i, p := range o.pages {
-		if p.Contains(key) || actor == nil {
+		if o.filters[i].Test(key[:]) || actor == nil {
 			index, err := p.FindIndex(counter, actor)
 			if err != nil {
 				if err == io.EOF {
-					continue
+					break
 				}
 				return 0, 0, err
 			}
@@ -86,29 +117,53 @@ func (o *Object) findPage(counter int64, actor []byte) (int, int64, error) {
 }
 
 func (o *Object) Insert(op Op) error {
-	pageIndex, index, err := o.findPage(op.RefCounter, op.RefActor)
+	pageIndex, opIndex, err := o.findPage(op.RefCounter, op.RefActor)
 	if err != nil {
 		return fmt.Errorf("unable to find page with counter, %v, and actor, %v: %w", op.RefCounter, op.RefActor, err)
 	}
 
 	page := o.pages[pageIndex]
 
-	if err := page.InsertAt(index, op); err != nil {
+	if err := page.InsertAt(opIndex, op); err != nil {
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
-	if page.rowCount > o.options.maxPageSize {
-		left, right, err := page.SplitAt(o.options.maxPageSize / 2)
+	key := makeBloomKey(op.OpCounter, op.OpActor)
+	o.filters[pageIndex].Add(key[:])
+
+	if page.rowCount > o.options.MaxPageSize {
+		// when pages exceed optimal size, split them in half.  splitting the pages in half will
+		// require recalculating the bloom filter for each of the resulting pages.
+		// todo - consider algorithms to split on other boundaries
+
+		splitAtIndex := o.options.MaxPageSize / 2
+		left, right, err := page.SplitAt(splitAtIndex)
 		if err != nil {
-			return fmt.Errorf("unable to insert record: failed to split page at index, %v: %w", 600, err)
+			return fmt.Errorf("unable to insert record: failed to split page at index, %v: %w", splitAtIndex, err)
 		}
+
+		leftFilter, err := makeBloomFilter(o.options.Bloom, left)
+		if err != nil {
+			return fmt.Errorf("unable to split page at index, %v: failed to update left bloom filter: %w", splitAtIndex, err)
+		}
+
+		rightFilter, err := makeBloomFilter(o.options.Bloom, right)
+		if err != nil {
+			return fmt.Errorf("unable to split page at index, %v: failed to update right bloom filter: %w", splitAtIndex, err)
+		}
+
 		o.pages = append(o.pages, nil)
+		o.filters = append(o.filters, nil)
 		for i := len(o.pages) - 1; i > pageIndex; i-- {
 			o.pages[i] = o.pages[i-1]
+			o.filters[i] = o.filters[i-1]
 		}
 
 		o.pages[pageIndex] = left
+		o.filters[pageIndex] = leftFilter
+
 		o.pages[pageIndex+1] = right
+		o.filters[pageIndex+1] = rightFilter
 	}
 
 	return nil
@@ -120,4 +175,36 @@ func (o *Object) Size() int {
 		size += p.Size()
 	}
 	return size
+}
+
+func makeBloomKey(counter int64, actor []byte) [40]byte {
+	var key [40]byte
+	offset := binary.PutVarint(key[:], counter)
+	length := len(actor)
+	if max := 40 - offset; length > max {
+		length = max
+	}
+	copy(key[offset:], actor[0:length])
+	return key
+}
+
+func makeBloomFilter(options bloomOptions, page *Page) (*bloom.BloomFilter, error) {
+	filter := bloom.New(options.M, options.K)
+	if page != nil {
+		var token IDToken
+		var err error
+		for {
+			token, err = page.NextID(token)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return nil, err
+			}
+
+			key := makeBloomKey(token.Counter, token.Actor)
+			filter.Add(key[:])
+		}
+	}
+	return filter, nil
 }

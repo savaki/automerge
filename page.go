@@ -16,16 +16,9 @@ package automerge
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"github.com/savaki/automerge/encoding"
-	"github.com/willf/bloom"
-	"io"
-)
 
-const (
-	bloomM = 15000
-	bloomK = 8
+	"github.com/savaki/automerge/encoding"
 )
 
 type Page struct {
@@ -36,7 +29,6 @@ type Page struct {
 	opType     *encoding.RLE
 	value      *encoding.Plain
 
-	filter   *bloom.BloomFilter
 	rowCount int64
 }
 
@@ -68,29 +60,7 @@ func NewPage(rawType encoding.RawType) *Page {
 		refActor:   encoding.NewDictionaryRLE(nil, nil),
 		opType:     encoding.NewRLE(nil),
 		value:      encoding.NewPlain(rawType, nil),
-		filter:     bloom.New(bloomM, bloomK),
 	}
-}
-
-func (p *Page) init() error {
-	var token IDToken
-	var err error
-	for {
-		token, err = p.NextID(token)
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-
-		data := makeBloomKey(token.Counter, token.Actor)
-		p.filter.Add(data[:])
-	}
-}
-
-func (p *Page) Contains(key [40]byte) bool {
-	return p.filter.Test(key[:])
 }
 
 func (p *Page) FindIndex(counter int64, actor []byte) (int64, error) {
@@ -155,21 +125,13 @@ func (p *Page) InsertAt(index int64, op Op) error {
 	}
 
 	p.rowCount++
-	key := makeBloomKey(op.OpCounter, op.OpActor)
-	p.filter.Add(key[:])
 
 	return nil
 }
 
 func (p *Page) SplitAt(index int64) (left, right *Page, err error) {
-	lp := &Page{
-		filter:   bloom.New(bloomM, bloomK),
-		rowCount: index,
-	}
-	rp := &Page{
-		filter:   bloom.New(bloomM, bloomK),
-		rowCount: p.rowCount - index,
-	}
+	lp := &Page{rowCount: index}
+	rp := &Page{rowCount: p.rowCount - index}
 
 	{
 		left, right, err := p.opCounter.SplitAt(index)
@@ -220,27 +182,9 @@ func (p *Page) SplitAt(index int64) (left, right *Page, err error) {
 		rp.value = right
 	}
 
-	if err := lp.init(); err != nil {
-		return nil, nil, err
-	}
-	if err := rp.init(); err != nil {
-		return nil, nil, err
-	}
-
 	return lp, rp, nil
 }
 
 func (p *Page) Size() int {
 	return p.opCounter.Size() + p.opActor.Size() + p.refCounter.Size() + p.refActor.Size() + p.opType.Size() + p.value.Size()
-}
-
-func makeBloomKey(counter int64, actor []byte) [40]byte {
-	var key [40]byte
-	offset := binary.PutVarint(key[:], counter)
-	length := len(actor)
-	if max := 40 - offset; length > max {
-		length = max
-	}
-	copy(key[offset:], actor[0:length])
-	return key
 }
