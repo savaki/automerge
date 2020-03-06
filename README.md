@@ -9,7 +9,7 @@ While the code will be functional at some point, the current intent of the code 
 
 # Current Performance
 
-Run from mac pro desktop.
+Run from mac pro desktop.  [https://github.com/savaki/automerge-benchmark](https://github.com/savaki/automerge-benchmark)
 
 ```text
 === RUN   TestPerformance
