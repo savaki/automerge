@@ -99,7 +99,7 @@ func NewObject(rawType encoding.RawType, opts ...ObjectOption) *Object {
 	}
 }
 
-func (o *Object) findPage(counter int64, actor []byte) (int, int64, error) {
+func (o *Object) findPageIndex(counter int64, actor []byte) (int, int64, error) {
 	key := makeBloomKey(counter, actor)
 	for i, p := range o.pages {
 		if o.filters[i].Test(key[:]) || actor == nil {
@@ -117,7 +117,7 @@ func (o *Object) findPage(counter int64, actor []byte) (int, int64, error) {
 }
 
 func (o *Object) Insert(op Op) error {
-	pageIndex, opIndex, err := o.findPage(op.RefCounter, op.RefActor)
+	pageIndex, opIndex, err := o.findPageIndex(op.RefCounter, op.RefActor)
 	if err != nil {
 		return fmt.Errorf("unable to find page with counter, %v, and actor, %v: %w", op.RefCounter, op.RefActor, err)
 	}
