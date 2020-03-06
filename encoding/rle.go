@@ -25,8 +25,8 @@ type RLE struct {
 }
 
 type RLEToken struct {
-	pos    int
-	repeat int
+	Pos    int
+	Repeat int
 	Index  int
 	Value  int64
 }
@@ -211,19 +211,19 @@ func (r *RLE) InsertAt(index, v int64) error {
 }
 
 func (r *RLE) Next(token RLEToken) (RLEToken, error) {
-	if token.repeat > 0 {
+	if token.Repeat > 0 {
 		return RLEToken{
-			pos:    token.pos,
+			Pos:    token.Pos,
 			Index:  token.Index + 1,
-			repeat: token.repeat - 1,
+			Repeat: token.Repeat - 1,
 			Value:  token.Value,
 		}, nil
 	}
-	if token.pos >= len(r.buffer) {
+	if token.Pos >= len(r.buffer) {
 		return RLEToken{}, io.EOF
 	}
 
-	pos := token.pos
+	pos := token.Pos
 	repeat, length := binary.Varint(r.buffer[pos:])
 
 	pos += length
@@ -234,15 +234,15 @@ func (r *RLE) Next(token RLEToken) (RLEToken, error) {
 	value, length := binary.Varint(r.buffer[pos:])
 
 	index := token.Index + 1
-	if token.pos == 0 {
+	if token.Pos == 0 {
 		index = 0
 	}
 
 	pos += length
 	return RLEToken{
-		pos:    pos,
+		Pos:    pos,
 		Index:  index,
-		repeat: int(repeat) - 1,
+		Repeat: int(repeat) - 1,
 		Value:  value,
 	}, nil
 }

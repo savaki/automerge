@@ -18,18 +18,19 @@ import (
 	"fmt"
 	"github.com/savaki/automerge/encoding"
 	"github.com/tj/assert"
+	"io"
 	"testing"
 )
 
-func TestNode_Insert(t *testing.T) {
+func TestObject_Insert(t *testing.T) {
 	const n = 1e4
 
 	me := []byte("me")
 	node := NewObject(encoding.RawTypeVarInt)
 	for i := int64(0); i < n; i++ {
 		op := Op{
-			OpCounter:  i + 1,
-			OpActor:    me,
+			Counter:    i + 1,
+			Actor:      me,
 			RefCounter: i,
 			RefActor:   nil,
 			Type:       0,
@@ -40,4 +41,19 @@ func TestNode_Insert(t *testing.T) {
 	}
 
 	fmt.Println(node.Size())
+}
+
+func readAllRunes(t *testing.T, obj *Object) []rune {
+	var runes []rune
+	var token ValueToken
+	var err error
+	for {
+		token, err = obj.NextValue(token)
+		if err == io.EOF {
+			break
+		}
+		assert.Nil(t, err)
+		runes = append(runes, rune(token.Value.Int))
+	}
+	return runes
 }

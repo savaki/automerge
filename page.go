@@ -39,13 +39,20 @@ type IDToken struct {
 	Actor        []byte
 }
 
+type PageValueToken struct {
+	opTypeToken encoding.RLEToken
+	valueToken  encoding.PlainToken
+	OpType      int64
+	Value       encoding.Value
+}
+
 type PageToken struct {
 	Op Op
 }
 
 type Op struct {
-	OpCounter  int64
-	OpActor    []byte
+	Counter    int64
+	Actor      []byte
 	RefCounter int64
 	RefActor   []byte
 	Type       int64
@@ -104,11 +111,30 @@ func (p *Page) NextID(token IDToken) (IDToken, error) {
 	}, nil
 }
 
+func (p *Page) NextValue(token PageValueToken) (PageValueToken, error) {
+	opTypeToken, err := p.opType.Next(token.opTypeToken)
+	if err != nil {
+		return PageValueToken{}, err
+	}
+
+	valueToken, err := p.value.Next(token.valueToken)
+	if err != nil {
+		return PageValueToken{}, err
+	}
+
+	return PageValueToken{
+		opTypeToken: opTypeToken,
+		valueToken:  valueToken,
+		OpType:      opTypeToken.Value,
+		Value:       valueToken.Value,
+	}, nil
+}
+
 func (p *Page) InsertAt(index int64, op Op) error {
-	if err := p.opCounter.InsertAt(index, op.OpCounter); err != nil {
+	if err := p.opCounter.InsertAt(index, op.Counter); err != nil {
 		return fmt.Errorf("unable to insert op counter: %w", err)
 	}
-	if err := p.opActor.InsertAt(index, op.OpActor); err != nil {
+	if err := p.opActor.InsertAt(index, op.Actor); err != nil {
 		return fmt.Errorf("unable to insert op actor: %w", err)
 	}
 	if err := p.refCounter.InsertAt(index, op.RefCounter); err != nil {

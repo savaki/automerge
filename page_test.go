@@ -35,8 +35,8 @@ func TestPage_InsertAt(t *testing.T) {
 		}
 
 		op := Op{
-			OpCounter:  i + 1,
-			OpActor:    oa,
+			Counter:    i + 1,
+			Actor:      oa,
 			RefCounter: i,
 			RefActor:   ra,
 			Type:       0,
@@ -72,8 +72,8 @@ func BenchmarkPage_Next(t *testing.B) {
 		}
 
 		op := Op{
-			OpCounter:  i + 1,
-			OpActor:    oa,
+			Counter:    i + 1,
+			Actor:      oa,
 			RefCounter: i,
 			RefActor:   ra,
 			Type:       0,

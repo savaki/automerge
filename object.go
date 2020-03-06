@@ -48,6 +48,11 @@ type Object struct {
 	rawType encoding.RawType
 }
 
+type ValueToken struct {
+	PageValueToken
+	pageIndex int
+}
+
 func makeObjectOptions(opts ...ObjectOption) objectOptions {
 	options := objectOptions{
 		Bloom: bloomOptions{
@@ -116,6 +121,28 @@ func (o *Object) findPageIndex(counter int64, actor []byte) (int, int64, error) 
 	return 0, 0, io.EOF
 }
 
+func (o *Object) NextValue(token ValueToken) (ValueToken, error) {
+	page := o.pages[token.pageIndex]
+	pvToken, err := page.NextValue(token.PageValueToken)
+	if err != nil {
+		if token.pageIndex+1 >= len(o.pages) || !errors.Is(err, io.EOF) {
+			return ValueToken{}, err
+		}
+
+		token.pageIndex++ // advance to next page
+		page = o.pages[token.pageIndex]
+		pvToken, err = page.NextValue(PageValueToken{})
+		if err != nil {
+			return ValueToken{}, err
+		}
+	}
+
+	return ValueToken{
+		PageValueToken: pvToken,
+		pageIndex:      token.pageIndex,
+	}, nil
+}
+
 func (o *Object) Insert(op Op) error {
 	pageIndex, opIndex, err := o.findPageIndex(op.RefCounter, op.RefActor)
 	if err != nil {
@@ -128,7 +155,7 @@ func (o *Object) Insert(op Op) error {
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
-	key := makeBloomKey(op.OpCounter, op.OpActor)
+	key := makeBloomKey(op.Counter, op.Actor)
 	o.filters[pageIndex].Add(key[:])
 
 	if page.rowCount > o.options.MaxPageSize {
