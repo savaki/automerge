@@ -16,9 +16,8 @@ package encoding
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
-
-	"github.com/tj/assert"
 )
 
 func TestDictionary_Lookup(t *testing.T) {
@@ -26,60 +25,99 @@ func TestDictionary_Lookup(t *testing.T) {
 
 	// upsert
 	v, err := d.LookupString("hello")
-	assert.Nil(t, err)
-	assert.EqualValues(t, 0, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(0), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	// idempotent
 	v, err = d.LookupString("hello")
-	assert.Nil(t, err)
-	assert.EqualValues(t, 0, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(0), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	// new value
 	v, err = d.LookupString("world")
-	assert.Nil(t, err)
-	assert.EqualValues(t, 1, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(1), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	buf := bytes.NewBuffer(nil)
 	err = d.AppendTo(buf)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
 	d = NewDictionary(buf.Bytes())
 
 	// idempotent
 	v, err = d.LookupString("world")
-	assert.Nil(t, err)
-	assert.EqualValues(t, 1, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(1), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	// and another
 	v, err = d.LookupString("blah")
-	assert.Nil(t, err)
-	assert.EqualValues(t, 2, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(2), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	data, err := d.Get(0)
-	assert.Nil(t, err)
-	assert.Equal(t, "hello", string(data))
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := "hello", string(data); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	data, err = d.Get(1)
-	assert.Nil(t, err)
-	assert.Equal(t, "world", string(data))
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := "world", string(data); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func BenchmarkDictionary(t *testing.B) {
 	d := NewDictionary(nil)
 
 	_, err := d.LookupString("hello")
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	_, err = d.LookupString("world")
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	buf := bytes.NewBuffer(nil)
 	err = d.AppendTo(buf)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	key := []byte("abc")
 	d = NewDictionary(buf.Bytes())
 	_, err = d.Lookup(key)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	for i := 0; i < t.N; i++ {
 		got, err := d.Lookup(key)
@@ -94,5 +132,7 @@ func BenchmarkDictionary(t *testing.B) {
 
 func Test_keyNotFound_Error(t *testing.T) {
 	err := keyNotFound{}
-	assert.Equal(t, "key not found", err.Error())
+	if got, want := err.Error(), "key not found"; !reflect.DeepEqual(want, got) {
+		t.Fatalf("got %v; want %v", len(got), want)
+	}
 }

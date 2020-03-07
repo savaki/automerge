@@ -16,10 +16,10 @@ package automerge
 
 import (
 	"fmt"
-	"github.com/savaki/automerge/encoding"
-	"github.com/tj/assert"
 	"io"
 	"testing"
+
+	"github.com/savaki/automerge/encoding"
 )
 
 func TestObject_Insert(t *testing.T) {
@@ -38,7 +38,9 @@ func TestObject_Insert(t *testing.T) {
 			Value: encoding.RuneValue('a'),
 		}
 		err := node.Insert(op)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 	}
 
 	fmt.Println(node.Size())
@@ -65,11 +67,15 @@ func TestObject_NextValue(t *testing.T) {
 			Value: encoding.RuneValue(r),
 		}
 		err := obj.Insert(op)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 	}
 
 	got := string(readAllRunes(t, obj))
-	assert.Equal(t, want, got)
+	if want, got := want, got; got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func readAllRunes(t *testing.T, obj *Object) []rune {
@@ -81,7 +87,10 @@ func readAllRunes(t *testing.T, obj *Object) []rune {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		runes = append(runes, rune(token.Value.Int))
 	}
 	return runes

@@ -18,9 +18,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"reflect"
 	"testing"
-
-	"github.com/tj/assert"
 )
 
 func TestRLE_InsertAt(t *testing.T) {
@@ -30,68 +29,104 @@ func TestRLE_InsertAt(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1}, values)
+		if want, got := []int64{1}, values; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("insert tail", func(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = r.InsertAt(1, 2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 2}, values)
+		if got, want := values, []int64{1, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert head - subsequent", func(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = r.InsertAt(0, 2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{2, 1}, values)
+		if got, want := values, []int64{2, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("increment repeat - start of run", func(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		want := len(r.buffer)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		got := len(r.buffer)
-		assert.Equal(t, want, got) // buffer should not have increased as we just incremented repeat by 1
+		if want, got := want, got; got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		} // buffer should not have increased as we just incremented repeat by 1
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 1}, values)
+		if got, want := values, []int64{1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("increment repeat - end of run", func(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		want := len(r.buffer)
 
 		err = r.InsertAt(1, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		got := len(r.buffer)
-		assert.Equal(t, want, got) // buffer should not have increased as we just incremented repeat by 1
+		if want, got := want, got; got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		} // buffer should not have increased as we just incremented repeat by 1
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 1}, values)
+		if got, want := values, []int64{1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert value in middle of sequence", func(t *testing.T) {
@@ -102,11 +137,15 @@ func TestRLE_InsertAt(t *testing.T) {
 
 		// When
 		err := r.InsertAt(2, 4)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 2, 4, 3}, values)
+		if got, want := values, []int64{1, 2, 4, 3}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("increment repeat - over var int length boundary", func(t *testing.T) {
@@ -114,21 +153,33 @@ func TestRLE_InsertAt(t *testing.T) {
 		n := 256
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		want := len(r.buffer)
 
 		for i := 0; i < n; i++ {
 			err = r.InsertAt(0, 1)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Fatalf("got %v; want nil", err)
+			}
+
 		}
 
 		got := len(r.buffer)
-		assert.NotEqual(t, want, got)
+		if got == want {
+			t.Fatalf("got %v; want not %v", got, want)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.Len(t, values, n+1)
+		if got, want := values, n+1; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 		for _, v := range values {
-			assert.EqualValues(t, 1, v)
+			if want, got := int64(1), v; want != got {
+				t.Fatalf("got %v, want %v", got, want)
+			}
 		}
 	})
 
@@ -136,52 +187,87 @@ func TestRLE_InsertAt(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		want := len(r.buffer)
 
 		// When - insert in middle of run
 		err = r.InsertAt(1, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := len(r.buffer)
-		assert.Equal(t, want, got)
+		if want, got := want, got; got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 1, 1, 1}, values)
+		if got, want := values, []int64{1, 1, 1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("break repeat - new value in middle of run", func(t *testing.T) {
 		r := NewRLE(nil)
 
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = r.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// When - insert in middle of run
 		err = r.InsertAt(1, 2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 2, 1, 1}, values)
+		if got, want := values, []int64{1, 2, 1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert at end", func(t *testing.T) {
 		r := NewRLE([]byte{122, 2})
-		assert.Len(t, MustInt64(r.Int64()), 61)
+		if got, want := MustInt64(r.Int64()), 61; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		err := r.InsertAt(60, 61)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := MustInt64(r.Int64())
-		assert.Len(t, got, 62)
-		assert.Equal(t, []int64{1, 1, 61, 1}, got[len(got)-4:])
+		if got, want := got, 62; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if got, want := got[len(got)-4:], []int64{1, 1, 61, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 }
 
@@ -200,12 +286,16 @@ func TestRLE_Next(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got = append(got, token.Value)
 	}
 
-	assert.EqualValues(t, []int64{1, 2, 3, 3}, got)
+	if got, want := got, []int64{1, 2, 3, 3}; !reflect.DeepEqual(want, got) {
+		t.Fatalf("got %v; want %v", len(got), want)
+	}
 }
 
 func TestRLE_DeleteAt(t *testing.T) {
@@ -215,8 +305,13 @@ func TestRLE_DeleteAt(t *testing.T) {
 
 		// When
 		err := r.DeleteAt(0)
-		assert.Nil(t, err)
-		assert.Len(t, r.buffer, 0)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if got, want := r.buffer, 0; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("decrement repeat count", func(t *testing.T) {
@@ -226,11 +321,15 @@ func TestRLE_DeleteAt(t *testing.T) {
 
 		// When
 		err := r.DeleteAt(0)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1}, values)
+		if want, got := []int64{1}, values; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("delete across var int size boundary", func(t *testing.T) {
@@ -239,15 +338,23 @@ func TestRLE_DeleteAt(t *testing.T) {
 
 		for i := 0; i < n; i++ {
 			err := r.InsertAt(0, 1)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Fatalf("got %v; want nil", err)
+			}
+
 		}
 
 		for i := 0; i < n; i++ {
 			err := r.DeleteAt(0)
-			assert.Nil(t, err)
+			if err != nil {
+				t.Fatalf("got %v; want nil", err)
+			}
+
 		}
 
-		assert.Len(t, r.buffer, 0)
+		if got, want := r.buffer, 0; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("delete middle element", func(t *testing.T) {
@@ -258,35 +365,51 @@ func TestRLE_DeleteAt(t *testing.T) {
 
 		// When
 		err := r.DeleteAt(1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		values := readAllRLE(r.buffer)
-		assert.EqualValues(t, []int64{1, 3}, values)
+		if got, want := values, []int64{1, 3}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("index below 0", func(t *testing.T) {
 		r := NewRLE(nil)
 		err := r.DeleteAt(-1)
-		assert.True(t, errors.Is(err, io.ErrUnexpectedEOF))
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("got false; want true")
+		}
 	})
 
 	t.Run("index out of bounds", func(t *testing.T) {
 		r := NewRLE(nil)
 		err := r.DeleteAt(2)
-		assert.True(t, errors.Is(err, io.ErrUnexpectedEOF))
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("got false; want true")
+		}
 	})
 
 	t.Run("delete in middle of long run", func(t *testing.T) {
 		r := NewRLE([]byte{122, 2})
-		assert.Len(t, MustInt64(r.Int64()), 61)
+		if got, want := MustInt64(r.Int64()), 61; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		err := r.InsertAt(60, 61)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := MustInt64(r.Int64())
-		assert.Len(t, got, 62)
-		assert.Equal(t, []int64{1, 1, 61, 1}, got[len(got)-4:])
+		if got, want := got, 62; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if got, want := got[len(got)-4:], []int64{1, 1, 61, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 }
 
@@ -305,49 +428,73 @@ func TestRLE_SplitAt(t *testing.T) {
 	t.Run("split on boundary", func(t *testing.T) {
 		base := makeRLE()
 		left, right, err := base.SplitAt(3)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllRLE(left.buffer)
-		assert.Equal(t, []int64{1, 1, 1}, l)
+		if got, want := l, []int64{1, 1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllRLE(right.buffer)
-		assert.Equal(t, []int64{2, 2, 2}, r)
+		if got, want := r, []int64{2, 2, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split in middle", func(t *testing.T) {
 		base := makeRLE()
 		left, right, err := base.SplitAt(2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllRLE(left.buffer)
-		assert.Equal(t, []int64{1, 1}, l)
+		if got, want := l, []int64{1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllRLE(right.buffer)
-		assert.Equal(t, []int64{1, 2, 2, 2}, r)
+		if got, want := r, []int64{1, 2, 2, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split head", func(t *testing.T) {
 		base := makeRLE()
 		left, right, err := base.SplitAt(0)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllRLE(left.buffer)
-		assert.Equal(t, []int64(nil), l)
+		if want, got := []int64(nil), l; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		r := readAllRLE(right.buffer)
-		assert.Equal(t, []int64{1, 1, 1, 2, 2, 2}, r)
+		if got, want := r, []int64{1, 1, 1, 2, 2, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split tail", func(t *testing.T) {
 		base := makeRLE()
 		left, right, err := base.SplitAt(6)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllRLE(left.buffer)
-		assert.Equal(t, []int64{1, 1, 1, 2, 2, 2}, l)
+		if got, want := l, []int64{1, 1, 1, 2, 2, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllRLE(right.buffer)
-		assert.Equal(t, []int64(nil), r)
+		if want, got := []int64(nil), r; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 }
 

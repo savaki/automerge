@@ -16,8 +16,6 @@ package encoding
 
 import (
 	"testing"
-
-	"github.com/tj/assert"
 )
 
 func TestReadValue(t *testing.T) {
@@ -25,22 +23,36 @@ func TestReadValue(t *testing.T) {
 		want := int64(123)
 		value := Int64Value(want)
 		data, err := value.Append(nil)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got, err := ReadValue(value.RawType, data)
-		assert.Nil(t, err)
-		assert.Equal(t, want, got.Int)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if want, got := want, got.Int; got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("rune", func(t *testing.T) {
 		want := 'a'
 		value := RuneValue(want)
 		data, err := value.Append(nil)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got, err := ReadValue(value.RawType, data)
-		assert.Nil(t, err)
-		assert.EqualValues(t, want, got.Int)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if want, got := want, got.Int; got != int64(want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("copy rune", func(t *testing.T) {
@@ -50,19 +62,31 @@ func TestReadValue(t *testing.T) {
 		value.Copy(data)
 
 		got, err := ReadValue(value.RawType, data)
-		assert.Nil(t, err)
-		assert.EqualValues(t, want, got.Int)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if want, got := want, got.Int; got != int64(want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("string", func(t *testing.T) {
 		want := "abc"
 		value := StringValue(want)
 		data, err := value.Append(nil)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got, err := ReadValue(value.RawType, data)
-		assert.Nil(t, err)
-		assert.Equal(t, want, string(got.Bytes))
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if want, got := want, string(got.Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 }
 
@@ -70,12 +94,21 @@ func TestPropertyValue(t *testing.T) {
 	k, v := int64(123), "abc"
 	buffer := PropertyValue(k, []byte(v))
 	gk, gv, err := DecodePropertyValue(buffer.Bytes)
-	assert.Nil(t, err)
-	assert.Equal(t, k, gk)
-	assert.Equal(t, v, string(gv))
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	if want, got := k, gk; got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if want, got := v, string(gv); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func TestRuneValue(t *testing.T) {
 	value := RuneValue('好')
-	assert.Equal(t, '好', rune(value.Int))
+	if want, got := '好', rune(value.Int); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }

@@ -17,7 +17,6 @@ package encoding
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/tj/assert"
 	"github.com/willf/bloom"
 	"reflect"
 	"testing"
@@ -190,6 +189,10 @@ func TestReadNil(t *testing.T) {
 func TestBloomFilter(t *testing.T) {
 	filter := bloom.New(12365, 3)
 	data, err := filter.GobEncode()
-	assert.Nil(t, err)
-	assert.Len(t, data, 1576)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if got, want := data, 1576; len(got) != want {
+		t.Fatalf("got %v; want %v", len(got), want)
+	}
 }

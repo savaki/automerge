@@ -15,8 +15,8 @@
 package encoding
 
 import (
-	"github.com/tj/assert"
 	"io"
+	"reflect"
 	"testing"
 )
 
@@ -24,59 +24,85 @@ func TestDelta_InsertAt(t *testing.T) {
 	t.Run("insert empty", func(t *testing.T) {
 		d := NewDelta(nil)
 		err := d.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		got := readAllDeltaRLE(t, d)
-		assert.Equal(t, []int64{1}, got)
+		if want, got := []int64{1}, got; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("insert head", func(t *testing.T) {
 		d := NewDelta(nil)
 
 		err := d.InsertAt(0, 2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = d.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		got := readAllDeltaRLE(t, d)
-		assert.Equal(t, []int64{1, 2}, got)
+		if got, want := got, []int64{1, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert tail - different values", func(t *testing.T) {
 		d := NewDelta(nil)
 
 		err := d.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = d.InsertAt(1, 5)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = d.InsertAt(2, 13)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		got := readAllDeltaRLE(t, d)
-		assert.Equal(t, []int64{1, 5, 13}, got)
+		if got, want := got, []int64{1, 5, 13}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert tail - same values", func(t *testing.T) {
 		d := NewDelta(nil)
 
 		err := d.InsertAt(0, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = d.InsertAt(1, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = d.InsertAt(2, 1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		got := readAllDeltaRLE(t, d)
-		assert.Equal(t, []int64{1, 1, 1}, got)
+		if got, want := got, []int64{1, 1, 1}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("insert middle", func(t *testing.T) {
@@ -86,23 +112,35 @@ func TestDelta_InsertAt(t *testing.T) {
 
 		// When
 		err := d.InsertAt(1, 2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		// Then
 		got := readAllDeltaRLE(t, d)
-		assert.Equal(t, []int64{1, 2, 3}, got)
+		if got, want := got, []int64{1, 2, 3}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("failed to insert at end", func(t *testing.T) {
 		d := NewDelta([]byte{122, 2})
-		assert.Len(t, d.MustValues(), 61)
+		if got, want := d.MustValues(), 61; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		err := d.InsertAt(60, 61)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := MustInt64(d.Int64())
-		assert.Len(t, got, 62)
-		assert.Equal(t, []int64{59, 60, 61, 61}, got[len(got)-4:])
+		if got, want := got, 62; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if got, want := got[len(got)-4:], []int64{59, 60, 61, 61}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 }
 
@@ -121,67 +159,99 @@ func TestDelta_SplitAt(t *testing.T) {
 	t.Run("verify sequence", func(t *testing.T) {
 		base := makeItem()
 		got := readAllDeltaRLE(t, base)
-		assert.Equal(t, []int64{1, 2, 3, 5, 7, 9}, got)
+		if got, want := got, []int64{1, 2, 3, 5, 7, 9}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split on boundary", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(3)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllDeltaRLE(t, left)
-		assert.Equal(t, []int64{1, 2, 3}, l)
+		if got, want := l, []int64{1, 2, 3}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllDeltaRLE(t, right)
-		assert.Equal(t, []int64{5, 7, 9}, r)
+		if got, want := r, []int64{5, 7, 9}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split in middle", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllDeltaRLE(t, left)
-		assert.Equal(t, []int64{1, 2}, l)
+		if got, want := l, []int64{1, 2}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllDeltaRLE(t, right)
-		assert.Equal(t, []int64{3, 5, 7, 9}, r)
+		if got, want := r, []int64{3, 5, 7, 9}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split head", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(0)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllDeltaRLE(t, left)
-		assert.Equal(t, []int64(nil), l)
+		if want, got := []int64(nil), l; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		r := readAllDeltaRLE(t, right)
-		assert.Equal(t, []int64{1, 2, 3, 5, 7, 9}, r)
+		if got, want := r, []int64{1, 2, 3, 5, 7, 9}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 
 	t.Run("split tail", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(6)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllDeltaRLE(t, left)
-		assert.Equal(t, []int64{1, 2, 3, 5, 7, 9}, l)
+		if got, want := l, []int64{1, 2, 3, 5, 7, 9}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllDeltaRLE(t, right)
-		assert.Equal(t, []int64(nil), r)
+		if want, got := []int64(nil), r; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("split then continue", func(t *testing.T) {
 		base := makeItem()
 		left, _, err := base.SplitAt(3)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = left.InsertAt(3, 4)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllDeltaRLE(t, left)
-		assert.Equal(t, []int64{1, 2, 3, 4}, l)
+		if got, want := l, []int64{1, 2, 3, 4}; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 }
 
@@ -194,7 +264,9 @@ func readAllDeltaRLE(t *testing.T, d *Delta) []int64 {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got = append(got, token.Value)
 	}

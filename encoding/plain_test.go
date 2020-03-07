@@ -17,8 +17,6 @@ package encoding
 import (
 	"io"
 	"testing"
-
-	"github.com/tj/assert"
 )
 
 func TestPlain_InsertAt(t *testing.T) {
@@ -27,11 +25,17 @@ func TestPlain_InsertAt(t *testing.T) {
 
 		want := "abc"
 		err := p.InsertAt(0, StringValue(want))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 1)
-		assert.Equal(t, want, string(got[0].Bytes))
+		if got, want := got, 1; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := want, string(got[0].Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("append", func(t *testing.T) {
@@ -40,15 +44,25 @@ func TestPlain_InsertAt(t *testing.T) {
 		b := "def"
 
 		err := p.InsertAt(0, StringValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(1, StringValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, a, string(got[0].Bytes))
-		assert.Equal(t, b, string(got[1].Bytes))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := a, string(got[0].Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := b, string(got[1].Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("prepend", func(t *testing.T) {
@@ -57,15 +71,25 @@ func TestPlain_InsertAt(t *testing.T) {
 		b := "def"
 
 		err := p.InsertAt(0, StringValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(0, StringValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, b, string(got[0].Bytes))
-		assert.Equal(t, a, string(got[1].Bytes))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := b, string(got[0].Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := a, string(got[1].Bytes); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 }
 
@@ -75,11 +99,17 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 
 		want := '你'
 		err := p.InsertAt(0, RuneValue('你'))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 1)
-		assert.Equal(t, want, rune(got[0].Int))
+		if got, want := got, 1; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := want, rune(got[0].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("append - single byte", func(t *testing.T) {
@@ -88,15 +118,25 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 		b := 'b'
 
 		err := p.InsertAt(0, RuneValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(1, RuneValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, a, rune(got[0].Int))
-		assert.Equal(t, b, rune(got[1].Int))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := a, rune(got[0].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := b, rune(got[1].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("append - multi byte", func(t *testing.T) {
@@ -105,15 +145,25 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 		b := '好'
 
 		err := p.InsertAt(0, RuneValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(1, RuneValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, a, rune(got[0].Int))
-		assert.Equal(t, b, rune(got[1].Int))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := a, rune(got[0].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := b, rune(got[1].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("prepend - single byte", func(t *testing.T) {
@@ -122,15 +172,25 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 		b := 'b'
 
 		err := p.InsertAt(0, RuneValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(0, RuneValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, b, rune(got[0].Int))
-		assert.Equal(t, a, rune(got[1].Int))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := b, rune(got[0].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := a, rune(got[1].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("prepend - multi byte", func(t *testing.T) {
@@ -139,15 +199,25 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 		b := '好'
 
 		err := p.InsertAt(0, RuneValue(a))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		err = p.InsertAt(0, RuneValue(b))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllValues(t, p)
-		assert.Len(t, got, 2)
-		assert.Equal(t, b, rune(got[0].Int))
-		assert.Equal(t, a, rune(got[1].Int))
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := b, rune(got[0].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := a, rune(got[1].Int); got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 }
 
@@ -160,7 +230,10 @@ func BenchmarkPlain_Next(t *testing.B) {
 	p := NewPlain(RawTypeVarInt, nil)
 	for i := 0; i < n; i++ {
 		err := p.InsertAt(0, Int64Value(v))
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 	}
 
 	for i := 0; i < t.N; i++ {
@@ -193,46 +266,82 @@ func TestPlain_SplitAt(t *testing.T) {
 	t.Run("split in middle", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(1)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllValues(t, left)
-		assert.Len(t, l, 1)
-		assert.EqualValues(t, 1, l[0].Int)
+		if got, want := l, 1; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := int64(1), l[0].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		r := readAllValues(t, right)
-		assert.Len(t, r, 2)
-		assert.EqualValues(t, 2, r[0].Int)
-		assert.EqualValues(t, 3, r[1].Int)
+		if got, want := r, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := int64(2), r[0].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := int64(3), r[1].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("split head", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(0)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllValues(t, left)
-		assert.Len(t, l, 0)
+		if got, want := l, 0; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 
 		r := readAllValues(t, right)
-		assert.Len(t, r, 3)
-		assert.EqualValues(t, 1, r[0].Int)
-		assert.EqualValues(t, 2, r[1].Int)
-		assert.EqualValues(t, 3, r[2].Int)
+		if got, want := r, 3; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := int64(1), r[0].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := int64(2), r[1].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := int64(3), r[2].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 
 	t.Run("split tail", func(t *testing.T) {
 		base := makeItem()
 		left, right, err := base.SplitAt(3)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		l := readAllValues(t, left)
-		assert.Len(t, l, 3)
-		assert.EqualValues(t, 1, l[0].Int)
-		assert.EqualValues(t, 2, l[1].Int)
-		assert.EqualValues(t, 3, l[2].Int)
+		if got, want := l, 3; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := int64(1), l[0].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := int64(2), l[1].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := int64(3), l[2].Int; want != got {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		r := readAllValues(t, right)
-		assert.Len(t, r, 0)
+		if got, want := r, 0; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
 	})
 }
 
@@ -245,8 +354,13 @@ func readAllValues(t *testing.T, p *Plain) []Value {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
-		assert.Equal(t, p.rawType, token.Value.RawType)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+		if want, got := p.rawType, token.Value.RawType; got != want {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		got = append(got, token.Value)
 	}

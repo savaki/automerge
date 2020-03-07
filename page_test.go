@@ -17,7 +17,6 @@ package automerge
 import (
 	"fmt"
 	"github.com/savaki/automerge/encoding"
-	"github.com/tj/assert"
 	"io"
 	"testing"
 )
@@ -41,7 +40,9 @@ func TestPage_InsertAt(t *testing.T) {
 			Value: encoding.RuneValue('a'),
 		}
 		err := page.InsertAt(i, op)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 	}
 
 	var token IDToken
@@ -51,7 +52,9 @@ func TestPage_InsertAt(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 	}
 
 	fmt.Println(page.Size())
@@ -76,7 +79,9 @@ func BenchmarkPage_Next(t *testing.B) {
 			Value: encoding.RuneValue('a'),
 		}
 		err := page.InsertAt(i, op)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 	}
 
 	for i := 0; i < t.N; i++ {

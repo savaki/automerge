@@ -16,9 +16,8 @@ package encoding
 
 import (
 	"io"
+	"reflect"
 	"testing"
-
-	"github.com/tj/assert"
 )
 
 func TestDictionaryRLE_InsertAt(t *testing.T) {
@@ -27,23 +26,42 @@ func TestDictionaryRLE_InsertAt(t *testing.T) {
 	a, b := []byte("hello"), []byte("world")
 
 	err := d.InsertAt(0, a)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	err = d.InsertAt(1, b)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
 
 	v, err := d.Lookup(a)
-	assert.Nil(t, err)
-	assert.EqualValues(t, 0, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	if want, got := int64(0), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	v, err = d.Lookup(b)
-	assert.Nil(t, err)
-	assert.EqualValues(t, 1, v)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+	if want, got := int64(1), v; want != got {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 
 	got := readAllDictionary(t, d)
-	assert.Len(t, got, 2)
-	assert.Equal(t, string(a), string(got[0]))
-	assert.Equal(t, string(b), string(got[1]))
+	if got, want := got, 2; len(got) != want {
+		t.Fatalf("got %v; want %v", len(got), want)
+	}
+	if want, got := string(a), string(got[0]); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if want, got := string(b), string(got[1]); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func TestDictionaryRLE_SplitAt(t *testing.T) {
@@ -51,23 +69,43 @@ func TestDictionaryRLE_SplitAt(t *testing.T) {
 		d := NewDictionaryRLE(nil, nil)
 		a, b, c := []byte("a"), []byte("b"), []byte("c")
 		err := d.InsertAt(0, a)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = d.InsertAt(1, b)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
 		err = d.InsertAt(2, c)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		left, right, err := d.SplitAt(2)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got := readAllDictionary(t, left)
-		assert.Len(t, got, 2)
-		assert.Equal(t, a, got[0])
-		assert.Equal(t, b, got[1])
+		if got, want := got, 2; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := a, got[0]; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		if want, got := b, got[1]; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 
 		got = readAllDictionary(t, right)
-		assert.Len(t, got, 1)
-		assert.Equal(t, c, got[0])
+		if got, want := got, 1; len(got) != want {
+			t.Fatalf("got %v; want %v", len(got), want)
+		}
+		if want, got := c, got[0]; !reflect.DeepEqual(want, got) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
 	})
 }
 
@@ -80,7 +118,9 @@ func readAllDictionary(t *testing.T, d *DictionaryRLE) [][]byte {
 		if err == io.EOF {
 			break
 		}
-		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
 
 		got = append(got, token.Value)
 	}

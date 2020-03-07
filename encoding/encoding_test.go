@@ -15,16 +15,19 @@
 package encoding
 
 import (
+	"reflect"
 	"testing"
 	"unicode/utf8"
-
-	"github.com/tj/assert"
 )
 
 func TestEquals(t *testing.T) {
-	assert.EqualValues(t, 4, lengthUint32)
+	if want, got := 4, lengthUint32; !reflect.DeepEqual(want, got) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func TestEncodeVarInt(t *testing.T) {
-	assert.Equal(t, 3, utf8.RuneLen('你'))
+	if want, got := 3, utf8.RuneLen('你'); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
