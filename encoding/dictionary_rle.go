@@ -134,6 +134,10 @@ func (d *DictionaryRLE) Next(token DictionaryRLEToken) (DictionaryRLEToken, erro
 	}, nil
 }
 
+func (d *DictionaryRLE) RowCount() int {
+	return len(readAllDictionary2(d))
+}
+
 func (d *DictionaryRLE) SplitAt(index int64) (left, right *DictionaryRLE, err error) {
 	left = NewDictionaryRLE(nil, nil)
 	right = NewDictionaryRLE(nil, nil)
@@ -167,4 +171,22 @@ func (d *DictionaryRLE) SplitAt(index int64) (left, right *DictionaryRLE, err er
 
 func (d *DictionaryRLE) Size() int {
 	return d.dict.Size() + d.data.Size()
+}
+
+func readAllDictionary2(d *DictionaryRLE) [][]byte {
+	var got [][]byte
+	var token DictionaryRLEToken
+	var err error
+	for {
+		token, err = d.Next(token)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+
+		got = append(got, token.Value)
+	}
+	return got
 }

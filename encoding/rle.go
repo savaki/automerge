@@ -94,7 +94,7 @@ func (r *RLE) writeAt(pos int, repeat, value int64) int {
 
 func (r *RLE) DeleteAt(index int64) error {
 	if index < 0 {
-		return io.ErrUnexpectedEOF
+		return fmt.Errorf("rle delete failed: %w", io.ErrUnexpectedEOF)
 	}
 
 	var i int64
@@ -102,10 +102,10 @@ func (r *RLE) DeleteAt(index int64) error {
 	for pos < len(r.buffer) {
 		block, err := r.readAt(pos)
 		if err != nil {
-			return fmt.Errorf("unable to delete index, %v: %w", index, err)
+			return fmt.Errorf("unable to delete @%v: %w", index, err)
 		}
 
-		if i >= index && i < index+block.Repeat {
+		if index >= i && index < i+block.Repeat {
 			// run length 1
 			if block.Repeat == 1 {
 				r.buffer = unshift(r.buffer, pos, block.Length)
@@ -129,7 +129,7 @@ func (r *RLE) DeleteAt(index int64) error {
 		i += block.Repeat
 		pos += block.Length
 	}
-	return io.ErrUnexpectedEOF
+	return fmt.Errorf("unable to delete @%v: %w", index, io.ErrUnexpectedEOF)
 }
 
 func (r *RLE) Get(index int64) (int64, error) {
@@ -210,6 +210,29 @@ func (r *RLE) InsertAt(index, v int64) error {
 	return nil
 }
 
+func (r *RLE) Int64() ([]int64, error) {
+	var pos int
+	var values []int64
+	if len(r.buffer) > 0 {
+		for {
+			repeat, length := binary.Varint(r.buffer[pos:])
+			pos += length
+
+			value, length := binary.Varint(r.buffer[pos:])
+			pos += length
+
+			for i := int64(0); i < repeat; i++ {
+				values = append(values, value)
+			}
+
+			if pos == len(r.buffer) {
+				break
+			}
+		}
+	}
+	return values, nil
+}
+
 func (r *RLE) Next(token RLEToken) (RLEToken, error) {
 	if token.Repeat > 0 {
 		return RLEToken{
@@ -247,6 +270,10 @@ func (r *RLE) Next(token RLEToken) (RLEToken, error) {
 	}, nil
 }
 
+func (r *RLE) RowCount() int {
+	return len(readAllRLE2(r.buffer))
+}
+
 func (r *RLE) Size() int {
 	return len(r.buffer)
 }
@@ -268,15 +295,19 @@ func (r *RLE) SplitAt(index int64) (left, right *RLE, err error) {
 		case index == i: // on run boundary
 			rb := make([]byte, 0, len(r.buffer))
 			rb = append(rb, r.buffer[pos:]...)
-			lb := r.buffer[0:pos]
+			lb := make([]byte, 0, len(r.buffer))
+			lb = append(lb, r.buffer[0:pos]...)
 			return NewRLE(lb), NewRLE(rb), nil
 
 		case index > i && index < i+repeat: // in the middle
-			right := NewRLE(make([]byte, 0, len(r.buffer)))
+			rb := make([]byte, 0, cap(r.buffer))
+			right := NewRLE(rb)
 			right.writeAtWithShift(0, repeat-(index-i), value)
 			right.buffer = append(right.buffer, r.buffer[pos+repeatLength+valueLength:]...)
 
-			left := NewRLE(r.buffer[0:pos])
+			lb := make([]byte, 0, cap(r.buffer))
+			lb = append(lb, r.buffer[0:pos]...)
+			left := NewRLE(lb)
 			left.writeAtWithShift(pos, index-i, value)
 
 			return left, right, nil
@@ -303,4 +334,27 @@ func rleEncode(repeat, value int64) rleBuffer {
 		Value:        vb,
 		ValueLength:  vn,
 	}
+}
+
+func readAllRLE2(buffer []byte) []int64 {
+	var pos int
+	var values []int64
+	if len(buffer) > 0 {
+		for {
+			repeat, length := binary.Varint(buffer[pos:])
+			pos += length
+
+			value, length := binary.Varint(buffer[pos:])
+			pos += length
+
+			for i := int64(0); i < repeat; i++ {
+				values = append(values, value)
+			}
+
+			if pos == len(buffer) {
+				break
+			}
+		}
+	}
+	return values
 }

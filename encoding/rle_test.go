@@ -16,6 +16,7 @@ package encoding
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"testing"
 
@@ -31,7 +32,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		err = r.InsertAt(0, 1)
 		assert.Nil(t, err)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1}, values)
 	})
 
@@ -44,7 +45,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		err = r.InsertAt(1, 2)
 		assert.Nil(t, err)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 2}, values)
 	})
 
@@ -57,7 +58,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		err = r.InsertAt(0, 2)
 		assert.Nil(t, err)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{2, 1}, values)
 	})
 
@@ -73,7 +74,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		got := len(r.buffer)
 		assert.Equal(t, want, got) // buffer should not have increased as we just incremented repeat by 1
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 1}, values)
 	})
 
@@ -89,7 +90,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		got := len(r.buffer)
 		assert.Equal(t, want, got) // buffer should not have increased as we just incremented repeat by 1
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 1}, values)
 	})
 
@@ -104,7 +105,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Then
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 2, 4, 3}, values)
 	})
 
@@ -124,7 +125,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		got := len(r.buffer)
 		assert.NotEqual(t, want, got)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.Len(t, values, n+1)
 		for _, v := range values {
 			assert.EqualValues(t, 1, v)
@@ -149,7 +150,7 @@ func TestRLE_InsertAt(t *testing.T) {
 		got := len(r.buffer)
 		assert.Equal(t, want, got)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 1, 1, 1}, values)
 	})
 
@@ -167,8 +168,20 @@ func TestRLE_InsertAt(t *testing.T) {
 		err = r.InsertAt(1, 2)
 		assert.Nil(t, err)
 
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 2, 1, 1}, values)
+	})
+
+	t.Run("insert at end", func(t *testing.T) {
+		r := NewRLE([]byte{122, 2})
+		assert.Len(t, MustInt64(r.Int64()), 61)
+
+		err := r.InsertAt(60, 61)
+		assert.Nil(t, err)
+
+		got := MustInt64(r.Int64())
+		assert.Len(t, got, 62)
+		assert.Equal(t, []int64{1, 1, 61, 1}, got[len(got)-4:])
 	})
 }
 
@@ -216,7 +229,7 @@ func TestRLE_DeleteAt(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Then
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1}, values)
 	})
 
@@ -248,20 +261,32 @@ func TestRLE_DeleteAt(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Then
-		values := readAllRLE(t, r.buffer)
+		values := readAllRLE(r.buffer)
 		assert.EqualValues(t, []int64{1, 3}, values)
 	})
 
 	t.Run("index below 0", func(t *testing.T) {
 		r := NewRLE(nil)
 		err := r.DeleteAt(-1)
-		assert.Equal(t, io.ErrUnexpectedEOF, err)
+		assert.True(t, errors.Is(err, io.ErrUnexpectedEOF))
 	})
 
 	t.Run("index out of bounds", func(t *testing.T) {
 		r := NewRLE(nil)
 		err := r.DeleteAt(2)
-		assert.Equal(t, io.ErrUnexpectedEOF, err)
+		assert.True(t, errors.Is(err, io.ErrUnexpectedEOF))
+	})
+
+	t.Run("delete in middle of long run", func(t *testing.T) {
+		r := NewRLE([]byte{122, 2})
+		assert.Len(t, MustInt64(r.Int64()), 61)
+
+		err := r.InsertAt(60, 61)
+		assert.Nil(t, err)
+
+		got := MustInt64(r.Int64())
+		assert.Len(t, got, 62)
+		assert.Equal(t, []int64{1, 1, 61, 1}, got[len(got)-4:])
 	})
 }
 
@@ -282,10 +307,10 @@ func TestRLE_SplitAt(t *testing.T) {
 		left, right, err := base.SplitAt(3)
 		assert.Nil(t, err)
 
-		l := readAllRLE(t, left.buffer)
+		l := readAllRLE(left.buffer)
 		assert.Equal(t, []int64{1, 1, 1}, l)
 
-		r := readAllRLE(t, right.buffer)
+		r := readAllRLE(right.buffer)
 		assert.Equal(t, []int64{2, 2, 2}, r)
 	})
 
@@ -294,10 +319,10 @@ func TestRLE_SplitAt(t *testing.T) {
 		left, right, err := base.SplitAt(2)
 		assert.Nil(t, err)
 
-		l := readAllRLE(t, left.buffer)
+		l := readAllRLE(left.buffer)
 		assert.Equal(t, []int64{1, 1}, l)
 
-		r := readAllRLE(t, right.buffer)
+		r := readAllRLE(right.buffer)
 		assert.Equal(t, []int64{1, 2, 2, 2}, r)
 	})
 
@@ -306,10 +331,10 @@ func TestRLE_SplitAt(t *testing.T) {
 		left, right, err := base.SplitAt(0)
 		assert.Nil(t, err)
 
-		l := readAllRLE(t, left.buffer)
+		l := readAllRLE(left.buffer)
 		assert.Equal(t, []int64(nil), l)
 
-		r := readAllRLE(t, right.buffer)
+		r := readAllRLE(right.buffer)
 		assert.Equal(t, []int64{1, 1, 1, 2, 2, 2}, r)
 	})
 
@@ -318,10 +343,10 @@ func TestRLE_SplitAt(t *testing.T) {
 		left, right, err := base.SplitAt(6)
 		assert.Nil(t, err)
 
-		l := readAllRLE(t, left.buffer)
+		l := readAllRLE(left.buffer)
 		assert.Equal(t, []int64{1, 1, 1, 2, 2, 2}, l)
 
-		r := readAllRLE(t, right.buffer)
+		r := readAllRLE(right.buffer)
 		assert.Equal(t, []int64(nil), r)
 	})
 }
@@ -349,7 +374,7 @@ func BenchmarkRLE_Next(t *testing.B) {
 	}
 }
 
-func readAllRLE(t *testing.T, buffer []byte) []int64 {
+func readAllRLE(buffer []byte) []int64 {
 	var pos int
 	var values []int64
 	if len(buffer) > 0 {

@@ -24,23 +24,52 @@ import (
 
 func TestObject_Insert(t *testing.T) {
 	const n = 1e4
-
-	me := []byte("me")
+	actor := []byte("me")
 	node := NewObject(encoding.RawTypeVarInt)
 	for i := int64(0); i < n; i++ {
+		refActor := actor
+		if i == 0 {
+			refActor = nil
+		}
 		op := Op{
-			Counter:    i + 1,
-			Actor:      me,
-			RefCounter: i,
-			RefActor:   nil,
-			Type:       0,
-			Value:      encoding.RuneValue('a'),
+			ID:    NewID(i+1, actor),
+			Ref:   NewID(i, refActor),
+			Type:  0,
+			Value: encoding.RuneValue('a'),
 		}
 		err := node.Insert(op)
 		assert.Nil(t, err)
 	}
 
 	fmt.Println(node.Size())
+}
+
+func TestObject_NextValue(t *testing.T) {
+	var (
+		actor = []byte("me")
+		want  = "hello world"
+		obj   = NewObject(encoding.RawTypeVarInt)
+	)
+
+	for i, r := range want {
+		refCounter := int64(i)
+		refActor := actor
+		if i == 0 {
+			refActor = nil
+		}
+
+		op := Op{
+			ID:    NewID(refCounter+1, actor),
+			Ref:   NewID(refCounter, refActor),
+			Type:  0,
+			Value: encoding.RuneValue(r),
+		}
+		err := obj.Insert(op)
+		assert.Nil(t, err)
+	}
+
+	got := string(readAllRunes(t, obj))
+	assert.Equal(t, want, got)
 }
 
 func readAllRunes(t *testing.T, obj *Object) []rune {

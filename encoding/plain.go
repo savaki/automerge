@@ -115,3 +115,21 @@ func (p *Plain) SplitAt(index int64) (left, right *Plain, err error) {
 func (p *Plain) Size() int {
 	return len(p.buffer)
 }
+
+func (p *Plain) RowCount() int {
+	var err error
+	var got []Value
+	var token PlainToken
+	for {
+		token, err = p.Next(token)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+
+		got = append(got, token.Value)
+	}
+	return len(got)
+}

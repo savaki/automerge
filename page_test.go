@@ -29,18 +29,16 @@ func TestPage_InsertAt(t *testing.T) {
 	you := []byte("you")
 	page := NewPage(encoding.RawTypeVarInt)
 	for i := int64(0); i < n; i++ {
-		oa, ra := you, me
+		actor, refActor := you, me
 		if i%8 == 0 {
-			oa, ra = me, you
+			actor, refActor = me, you
 		}
 
 		op := Op{
-			Counter:    i + 1,
-			Actor:      oa,
-			RefCounter: i,
-			RefActor:   ra,
-			Type:       0,
-			Value:      encoding.RuneValue('a'),
+			ID:    NewID(i+1, actor),
+			Ref:   NewID(i, refActor),
+			Type:  0,
+			Value: encoding.RuneValue('a'),
 		}
 		err := page.InsertAt(i, op)
 		assert.Nil(t, err)
@@ -66,18 +64,16 @@ func BenchmarkPage_Next(t *testing.B) {
 	you := []byte("you")
 	page := NewPage(encoding.RawTypeVarInt)
 	for i := int64(0); i < n; i++ {
-		oa, ra := you, me
+		actor, refActor := you, me
 		if i%8 == 0 {
-			oa, ra = me, you
+			actor, refActor = me, you
 		}
 
 		op := Op{
-			Counter:    i + 1,
-			Actor:      oa,
-			RefCounter: i,
-			RefActor:   ra,
-			Type:       0,
-			Value:      encoding.RuneValue('a'),
+			ID:    NewID(i+1, actor),
+			Ref:   NewID(i, refActor),
+			Type:  0,
+			Value: encoding.RuneValue('a'),
 		}
 		err := page.InsertAt(i, op)
 		assert.Nil(t, err)

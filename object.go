@@ -15,7 +15,6 @@
 package automerge
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -25,7 +24,7 @@ import (
 )
 
 const (
-	defaultRowCount = 100
+	defaultRowCount = 200
 	defaultBloomM   = 15000
 	defaultBloomK   = 8
 )
@@ -46,6 +45,14 @@ type Object struct {
 	pages   []*Page
 	filters []*bloom.BloomFilter
 	rawType encoding.RawType
+
+	last struct {
+		Filter    *bloom.BloomFilter
+		ID        ID
+		Index     int64
+		PageIndex int
+		Ok        bool
+	}
 }
 
 type ValueToken struct {
@@ -104,21 +111,84 @@ func NewObject(rawType encoding.RawType, opts ...ObjectOption) *Object {
 	}
 }
 
-func (o *Object) findPageIndex(counter int64, actor []byte) (int, int64, error) {
-	key := makeBloomKey(counter, actor)
+func (o *Object) findPageIndex(id ID) (int, int64, error) {
+	var key *bloomKey
+	if o.last.Ok {
+		// many times, the next edit will follow the previous
+		if o.last.ID.Equal(id) {
+			return o.last.PageIndex, o.last.Index, nil
+		}
+
+		// even if not directly next, they next edit is often close to the previous
+		key = makeBloomKey(id.Counter, id.Actor)
+		defer key.Free()
+		if o.last.Filter.Test(key.data) {
+			page := o.pages[o.last.PageIndex]
+			if index, err := page.FindIndex(id.Counter, id.Actor); err == nil {
+				return o.last.PageIndex, index, nil
+			}
+		}
+	}
+
+	if id.Counter == 0 && len(id.Actor) == 0 {
+		return 0, -1, nil
+	}
+
+	if key == nil {
+		key = makeBloomKey(id.Counter, id.Actor)
+		defer key.Free()
+	}
+
 	for i, p := range o.pages {
-		if o.filters[i].Test(key[:]) || actor == nil {
-			index, err := p.FindIndex(counter, actor)
+		if o.filters[i].Test(key.data) || id.Actor == nil {
+			index, err := p.FindIndex(id.Counter, id.Actor)
 			if err != nil {
 				if err == io.EOF {
-					break
+					continue
 				}
-				return 0, 0, err
+				return 0, 0, fmt.Errorf("unable to find (%v,%v) in page, %v: false positive: %w", id.Counter, id.Actor, i, err)
 			}
 			return i, index, nil
 		}
 	}
 	return 0, 0, io.EOF
+}
+
+func (o *Object) splitPageAt(pageIndex int, index int64) error {
+	// when pages exceed optimal size, split them in half.  splitting the pages in half will
+	// require recalculating the bloom filter for each of the resulting pages.
+	// todo - consider algorithms to split on other boundaries
+
+	page := o.pages[pageIndex]
+	left, right, err := page.SplitAt(index)
+	if err != nil {
+		return fmt.Errorf("unable to insert record: failed to split page, %v, at index, %v: %w", pageIndex, index, err)
+	}
+
+	leftFilter, err := makeBloomFilter(o.options.Bloom, left)
+	if err != nil {
+		return fmt.Errorf("unable to split page at index, %v: failed to update left bloom filter: %w", index, err)
+	}
+
+	rightFilter, err := makeBloomFilter(o.options.Bloom, right)
+	if err != nil {
+		return fmt.Errorf("unable to split page at index, %v: failed to update right bloom filter: %w", index, err)
+	}
+
+	o.pages = append(o.pages, nil)
+	o.filters = append(o.filters, nil)
+	for i := len(o.pages) - 1; i > pageIndex; i-- {
+		o.pages[i] = o.pages[i-1]
+		o.filters[i] = o.filters[i-1]
+	}
+
+	o.pages[pageIndex] = left
+	o.filters[pageIndex] = leftFilter
+
+	o.pages[pageIndex+1] = right
+	o.filters[pageIndex+1] = rightFilter
+
+	return nil
 }
 
 func (o *Object) NextValue(token ValueToken) (ValueToken, error) {
@@ -144,53 +214,39 @@ func (o *Object) NextValue(token ValueToken) (ValueToken, error) {
 }
 
 func (o *Object) Insert(op Op) error {
-	pageIndex, opIndex, err := o.findPageIndex(op.RefCounter, op.RefActor)
+	pageIndex, opIndex, err := o.findPageIndex(op.Ref)
 	if err != nil {
-		return fmt.Errorf("unable to find page with counter, %v, and actor, %v: %w", op.RefCounter, op.RefActor, err)
+		return fmt.Errorf("unable to find page with id (%v,%v): %w", op.Ref.Counter, op.Ref.Actor, err)
 	}
 
 	page := o.pages[pageIndex]
 
-	if err := page.InsertAt(opIndex, op); err != nil {
-		return fmt.Errorf("insert failed: %w", err)
+	if err := page.InsertAt(opIndex+1, op); err != nil {
+		return err
 	}
 
-	key := makeBloomKey(op.Counter, op.Actor)
-	o.filters[pageIndex].Add(key[:])
+	key := makeBloomKey(op.ID.Counter, op.ID.Actor)
+	defer key.Free()
+	filter := o.filters[pageIndex]
+	filter.Add(key.data)
 
-	if page.rowCount > o.options.MaxPageSize {
+	o.last.Filter = filter
+	o.last.ID = op.ID
+	o.last.Index = opIndex + 1
+	o.last.PageIndex = pageIndex
+	o.last.Ok = true
+
+	if page.rowCount >= o.options.MaxPageSize {
 		// when pages exceed optimal size, split them in half.  splitting the pages in half will
 		// require recalculating the bloom filter for each of the resulting pages.
 		// todo - consider algorithms to split on other boundaries
 
 		splitAtIndex := o.options.MaxPageSize / 2
-		left, right, err := page.SplitAt(splitAtIndex)
-		if err != nil {
-			return fmt.Errorf("unable to insert record: failed to split page at index, %v: %w", splitAtIndex, err)
+		if err := o.splitPageAt(pageIndex, splitAtIndex); err != nil {
+			return err
 		}
 
-		leftFilter, err := makeBloomFilter(o.options.Bloom, left)
-		if err != nil {
-			return fmt.Errorf("unable to split page at index, %v: failed to update left bloom filter: %w", splitAtIndex, err)
-		}
-
-		rightFilter, err := makeBloomFilter(o.options.Bloom, right)
-		if err != nil {
-			return fmt.Errorf("unable to split page at index, %v: failed to update right bloom filter: %w", splitAtIndex, err)
-		}
-
-		o.pages = append(o.pages, nil)
-		o.filters = append(o.filters, nil)
-		for i := len(o.pages) - 1; i > pageIndex; i-- {
-			o.pages[i] = o.pages[i-1]
-			o.filters[i] = o.filters[i-1]
-		}
-
-		o.pages[pageIndex] = left
-		o.filters[pageIndex] = leftFilter
-
-		o.pages[pageIndex+1] = right
-		o.filters[pageIndex+1] = rightFilter
+		o.last.Ok = false // things got rearranged after page split
 	}
 
 	return nil
@@ -202,36 +258,4 @@ func (o *Object) Size() int {
 		size += p.Size()
 	}
 	return size
-}
-
-func makeBloomKey(counter int64, actor []byte) [40]byte {
-	var key [40]byte
-	offset := binary.PutVarint(key[:], counter)
-	length := len(actor)
-	if max := 40 - offset; length > max {
-		length = max
-	}
-	copy(key[offset:], actor[0:length])
-	return key
-}
-
-func makeBloomFilter(options bloomOptions, page *Page) (*bloom.BloomFilter, error) {
-	filter := bloom.New(options.M, options.K)
-	if page != nil {
-		var token IDToken
-		var err error
-		for {
-			token, err = page.NextID(token)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				return nil, err
-			}
-
-			key := makeBloomKey(token.Counter, token.Actor)
-			filter.Add(key[:])
-		}
-	}
-	return filter, nil
 }

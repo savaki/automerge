@@ -45,7 +45,7 @@ func TestDelta_InsertAt(t *testing.T) {
 		assert.Equal(t, []int64{1, 2}, got)
 	})
 
-	t.Run("insert tail", func(t *testing.T) {
+	t.Run("insert tail - different values", func(t *testing.T) {
 		d := NewDelta(nil)
 
 		err := d.InsertAt(0, 1)
@@ -62,6 +62,23 @@ func TestDelta_InsertAt(t *testing.T) {
 		assert.Equal(t, []int64{1, 5, 13}, got)
 	})
 
+	t.Run("insert tail - same values", func(t *testing.T) {
+		d := NewDelta(nil)
+
+		err := d.InsertAt(0, 1)
+		assert.Nil(t, err)
+
+		err = d.InsertAt(1, 1)
+		assert.Nil(t, err)
+
+		err = d.InsertAt(2, 1)
+		assert.Nil(t, err)
+
+		// Then
+		got := readAllDeltaRLE(t, d)
+		assert.Equal(t, []int64{1, 1, 1}, got)
+	})
+
 	t.Run("insert middle", func(t *testing.T) {
 		d := NewDelta(nil)
 		_ = d.InsertAt(0, 1)
@@ -74,6 +91,18 @@ func TestDelta_InsertAt(t *testing.T) {
 		// Then
 		got := readAllDeltaRLE(t, d)
 		assert.Equal(t, []int64{1, 2, 3}, got)
+	})
+
+	t.Run("failed to insert at end", func(t *testing.T) {
+		d := NewDelta([]byte{122, 2})
+		assert.Len(t, d.MustValues(), 61)
+
+		err := d.InsertAt(60, 61)
+		assert.Nil(t, err)
+
+		got := MustInt64(d.Int64())
+		assert.Len(t, got, 62)
+		assert.Equal(t, []int64{59, 60, 61, 61}, got[len(got)-4:])
 	})
 }
 
@@ -141,6 +170,18 @@ func TestDelta_SplitAt(t *testing.T) {
 
 		r := readAllDeltaRLE(t, right)
 		assert.Equal(t, []int64(nil), r)
+	})
+
+	t.Run("split then continue", func(t *testing.T) {
+		base := makeItem()
+		left, _, err := base.SplitAt(3)
+		assert.Nil(t, err)
+
+		err = left.InsertAt(3, 4)
+		assert.Nil(t, err)
+
+		l := readAllDeltaRLE(t, left)
+		assert.Equal(t, []int64{1, 2, 3, 4}, l)
 	})
 }
 

@@ -21,9 +21,25 @@ import (
 	"github.com/savaki/automerge/encoding"
 )
 
+type ID struct {
+	Counter int64
+	Actor   []byte
+}
+
+func (i ID) Equal(that ID) bool {
+	return i.Counter == that.Counter && bytes.Equal(i.Actor, that.Actor)
+}
+
+func NewID(counter int64, actor []byte) ID {
+	return ID{
+		Counter: counter,
+		Actor:   actor,
+	}
+}
+
 type Page struct {
-	opCounter  *encoding.Delta
-	opActor    *encoding.DictionaryRLE
+	counter    *encoding.Delta
+	actor      *encoding.DictionaryRLE
 	refCounter *encoding.Delta
 	refActor   *encoding.DictionaryRLE
 	opType     *encoding.RLE
@@ -51,18 +67,16 @@ type PageToken struct {
 }
 
 type Op struct {
-	Counter    int64
-	Actor      []byte
-	RefCounter int64
-	RefActor   []byte
-	Type       int64
-	Value      encoding.Value
+	ID    ID
+	Ref   ID
+	Type  int64
+	Value encoding.Value
 }
 
 func NewPage(rawType encoding.RawType) *Page {
 	return &Page{
-		opCounter:  encoding.NewDelta(nil),
-		opActor:    encoding.NewDictionaryRLE(nil, nil),
+		counter:    encoding.NewDelta(nil),
+		actor:      encoding.NewDictionaryRLE(nil, nil),
 		refCounter: encoding.NewDelta(nil),
 		refActor:   encoding.NewDictionaryRLE(nil, nil),
 		opType:     encoding.NewRLE(nil),
@@ -71,10 +85,6 @@ func NewPage(rawType encoding.RawType) *Page {
 }
 
 func (p *Page) FindIndex(counter int64, actor []byte) (int64, error) {
-	if actor == nil {
-		return 0, nil
-	}
-
 	var i int64
 	var token IDToken
 	var err error
@@ -93,12 +103,12 @@ func (p *Page) FindIndex(counter int64, actor []byte) (int64, error) {
 }
 
 func (p *Page) NextID(token IDToken) (IDToken, error) {
-	counterToken, err := p.opCounter.Next(token.counterToken)
+	counterToken, err := p.counter.Next(token.counterToken)
 	if err != nil {
 		return IDToken{}, err
 	}
 
-	actorToken, err := p.opActor.Next(token.actorToken)
+	actorToken, err := p.actor.Next(token.actorToken)
 	if err != nil {
 		return IDToken{}, err
 	}
@@ -131,16 +141,16 @@ func (p *Page) NextValue(token PageValueToken) (PageValueToken, error) {
 }
 
 func (p *Page) InsertAt(index int64, op Op) error {
-	if err := p.opCounter.InsertAt(index, op.Counter); err != nil {
+	if err := p.counter.InsertAt(index, op.ID.Counter); err != nil {
 		return fmt.Errorf("unable to insert op counter: %w", err)
 	}
-	if err := p.opActor.InsertAt(index, op.Actor); err != nil {
+	if err := p.actor.InsertAt(index, op.ID.Actor); err != nil {
 		return fmt.Errorf("unable to insert op actor: %w", err)
 	}
-	if err := p.refCounter.InsertAt(index, op.RefCounter); err != nil {
+	if err := p.refCounter.InsertAt(index, op.Ref.Counter); err != nil {
 		return fmt.Errorf("unable to insert ref counter: %w", err)
 	}
-	if err := p.refActor.InsertAt(index, op.RefActor); err != nil {
+	if err := p.refActor.InsertAt(index, op.Ref.Actor); err != nil {
 		return fmt.Errorf("unable to insert ref actor: %w", err)
 	}
 	if err := p.opType.InsertAt(index, op.Type); err != nil {
@@ -160,20 +170,20 @@ func (p *Page) SplitAt(index int64) (left, right *Page, err error) {
 	rp := &Page{rowCount: p.rowCount - index}
 
 	{
-		left, right, err := p.opCounter.SplitAt(index)
+		left, right, err := p.counter.SplitAt(index)
 		if err != nil {
 			return nil, nil, fmt.Errorf("split at failed: op counter split failed: %w", err)
 		}
-		lp.opCounter = left
-		rp.opCounter = right
+		lp.counter = left
+		rp.counter = right
 	}
 	{
-		left, right, err := p.opActor.SplitAt(index)
+		left, right, err := p.actor.SplitAt(index)
 		if err != nil {
 			return nil, nil, fmt.Errorf("split at failed: op actor split failed: %w", err)
 		}
-		lp.opActor = left
-		rp.opActor = right
+		lp.actor = left
+		rp.actor = right
 	}
 	{
 		left, right, err := p.refCounter.SplitAt(index)
@@ -212,5 +222,5 @@ func (p *Page) SplitAt(index int64) (left, right *Page, err error) {
 }
 
 func (p *Page) Size() int {
-	return p.opCounter.Size() + p.opActor.Size() + p.refCounter.Size() + p.refActor.Size() + p.opType.Size() + p.value.Size()
+	return p.counter.Size() + p.actor.Size() + p.refCounter.Size() + p.refActor.Size() + p.opType.Size() + p.value.Size()
 }

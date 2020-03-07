@@ -15,6 +15,7 @@
 package encoding
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -29,7 +30,12 @@ type DeltaToken struct {
 }
 
 func NewDelta(buffer []byte) *Delta {
-	return &Delta{rle: NewRLE(buffer)}
+	rle := NewRLE(buffer)
+
+	return &Delta{
+		rle:     rle,
+		numRows: int64(rle.RowCount()),
+	}
 }
 
 func (d *Delta) Get(index int64) (int64, error) {
@@ -52,7 +58,7 @@ func (d *Delta) Get(index int64) (int64, error) {
 
 func (d *Delta) InsertAt(index, value int64) error {
 	switch {
-	case index < 0 || index > d.numRows:
+	case index < 0 || index > int64(d.numRows):
 		return io.ErrUnexpectedEOF
 
 	case d.numRows == 0: // empty
@@ -89,13 +95,13 @@ func (d *Delta) InsertAt(index, value int64) error {
 
 		if i == index {
 			if err := d.rle.DeleteAt(i); err != nil {
-				return nil
+				return fmt.Errorf("unable to insert delta, %v@%v: %w", value, index, err)
 			}
 			if err := d.rle.InsertAt(i, value-lastValue); err != nil {
-				return nil
+				return fmt.Errorf("unable to insert delta, %v@%v: %w", value, index, err)
 			}
 			if err := d.rle.InsertAt(i+1, token.Value-value); err != nil {
-				return nil
+				return fmt.Errorf("unable to insert delta, %v@%v: %w", value, index, err)
 			}
 			d.numRows++
 			return nil
@@ -122,6 +128,10 @@ func (d *Delta) Next(token DeltaToken) (DeltaToken, error) {
 		rle:   rleToken,
 		Value: token.Value + rleToken.Value,
 	}, nil
+}
+
+func (d *Delta) Raw() []byte {
+	return d.rle.buffer
 }
 
 func (d *Delta) Size() int {
@@ -155,4 +165,30 @@ func (d *Delta) SplitAt(index int64) (left, right *Delta, err error) {
 	}
 
 	return
+}
+
+func (d *Delta) Int64() ([]int64, error) {
+	var err error
+	var got []int64
+	var token DeltaToken
+	for {
+		token, err = d.Next(token)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+
+		got = append(got, token.Value)
+	}
+	return got, nil
+}
+
+func (d *Delta) MustValues() []int64 {
+	got, err := d.Int64()
+	if err != nil {
+		panic(err)
+	}
+	return got
 }
