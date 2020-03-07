@@ -111,7 +111,8 @@ func NewObject(rawType encoding.RawType, opts ...ObjectOption) *Object {
 	}
 }
 
-func (o *Object) findPageIndex(id ID) (int, int64, error) {
+// findPageIndex accepts an id and returns the index within r.pages
+func (o *Object) findPageIndex(id ID) (pageIndex int, index int64, err error) {
 	var key *bloomKey
 	if o.last.Ok {
 		// many times, the next edit will follow the previous
@@ -250,6 +251,13 @@ func (o *Object) Insert(op Op) error {
 	}
 
 	return nil
+}
+
+func (o *Object) RowCount() (n int64) {
+	for _, p := range o.pages {
+		n += p.rowCount
+	}
+	return
 }
 
 func (o *Object) Size() int {
