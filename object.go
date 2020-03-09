@@ -39,6 +39,12 @@ type objectOptions struct {
 	MaxPageSize int64
 }
 
+type location struct {
+	Offset    int64
+	OpIndex   int64
+	PageIndex int
+}
+
 // Object encapsulates a logical object within the document e.g. a Text block, an Object, an Array, etc
 type Object struct {
 	options objectOptions
@@ -47,11 +53,11 @@ type Object struct {
 	rawType encoding.RawType
 
 	last struct {
-		Filter    *bloom.BloomFilter
-		ID        ID
-		Index     int64
-		PageIndex int
-		Ok        bool
+		Filter       *bloom.BloomFilter
+		FilterOffset int64
+		ID           ID
+		Location     location
+		Ok           bool
 	}
 }
 
@@ -112,27 +118,35 @@ func NewObject(rawType encoding.RawType, opts ...ObjectOption) *Object {
 }
 
 // findPageIndex accepts an id and returns the index within r.pages
-func (o *Object) findPageIndex(id ID) (pageIndex int, index int64, err error) {
+func (o *Object) findPageIndex(id ID) (location, error) {
 	var key *bloomKey
 	if o.last.Ok {
 		// many times, the next edit will follow the previous
 		if o.last.ID.Equal(id) {
-			return o.last.PageIndex, o.last.Index, nil
+			return o.last.Location, nil
 		}
 
 		// even if not directly next, they next edit is often close to the previous
 		key = makeBloomKey(id.Counter, id.Actor)
 		defer key.Free()
 		if o.last.Filter.Test(key.data) {
-			page := o.pages[o.last.PageIndex]
+			page := o.pages[o.last.Location.PageIndex]
 			if index, err := page.FindIndex(id.Counter, id.Actor); err == nil {
-				return o.last.PageIndex, index, nil
+				return location{
+					Offset:    o.last.FilterOffset + index,
+					PageIndex: o.last.Location.PageIndex,
+					OpIndex:   index,
+				}, nil
 			}
 		}
 	}
 
 	if id.Counter == 0 && len(id.Actor) == 0 {
-		return 0, -1, nil
+		return location{
+			Offset:    -1,
+			PageIndex: 0,
+			OpIndex:   -1,
+		}, nil
 	}
 
 	if key == nil {
@@ -140,19 +154,28 @@ func (o *Object) findPageIndex(id ID) (pageIndex int, index int64, err error) {
 		defer key.Free()
 	}
 
+	var objectIndex int64
 	for i, p := range o.pages {
 		if o.filters[i].Test(key.data) || id.Actor == nil {
 			index, err := p.FindIndex(id.Counter, id.Actor)
 			if err != nil {
 				if err == io.EOF {
+					objectIndex += p.rowCount
 					continue
 				}
-				return 0, 0, fmt.Errorf("unable to find (%v,%v) in page, %v: false positive: %w", id.Counter, id.Actor, i, err)
+				return location{}, fmt.Errorf("unable to find (%v,%v) in page, %v: false positive: %w", id.Counter, id.Actor, i, err)
 			}
-			return i, index, nil
+
+			return location{
+				Offset:    objectIndex + index,
+				PageIndex: i,
+				OpIndex:   index,
+			}, nil
 		}
+
+		objectIndex += p.rowCount
 	}
-	return 0, 0, io.EOF
+	return location{}, io.EOF
 }
 
 func (o *Object) splitPageAt(pageIndex int, index int64) error {
@@ -214,27 +237,33 @@ func (o *Object) NextValue(token ValueToken) (ValueToken, error) {
 	}, nil
 }
 
-func (o *Object) Insert(op Op) error {
-	pageIndex, opIndex, err := o.findPageIndex(op.Ref)
+func (o *Object) Apply(op Op) (int64, error) {
+	ref, err := o.findPageIndex(op.Ref)
 	if err != nil {
-		return fmt.Errorf("unable to find page with id (%v,%v): %w", op.Ref.Counter, op.Ref.Actor, err)
+		return 0, fmt.Errorf("unable to find page with id (%v,%v): %w", op.Ref.Counter, op.Ref.Actor, err)
 	}
 
-	page := o.pages[pageIndex]
+	page := o.pages[ref.PageIndex]
 
-	if err := page.InsertAt(opIndex+1, op); err != nil {
-		return err
+	if err := page.InsertAt(ref.OpIndex+1, op); err != nil {
+		return 0, err
 	}
 
 	key := makeBloomKey(op.ID.Counter, op.ID.Actor)
 	defer key.Free()
-	filter := o.filters[pageIndex]
+	filter := o.filters[ref.PageIndex]
 	filter.Add(key.data)
 
+	loc := location{
+		Offset:    ref.Offset + 1,
+		OpIndex:   ref.OpIndex + 1,
+		PageIndex: ref.PageIndex,
+	}
+
 	o.last.Filter = filter
+	o.last.FilterOffset = ref.Offset - ref.OpIndex
 	o.last.ID = op.ID
-	o.last.Index = opIndex + 1
-	o.last.PageIndex = pageIndex
+	o.last.Location = loc
 	o.last.Ok = true
 
 	if page.rowCount >= o.options.MaxPageSize {
@@ -243,14 +272,14 @@ func (o *Object) Insert(op Op) error {
 		// todo - consider algorithms to split on other boundaries
 
 		splitAtIndex := o.options.MaxPageSize / 2
-		if err := o.splitPageAt(pageIndex, splitAtIndex); err != nil {
-			return err
+		if err := o.splitPageAt(ref.PageIndex, splitAtIndex); err != nil {
+			return 0, err
 		}
 
 		o.last.Ok = false // things got rearranged after page split
 	}
 
-	return nil
+	return loc.Offset, nil
 }
 
 func (o *Object) RowCount() (n int64) {

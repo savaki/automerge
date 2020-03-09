@@ -37,8 +37,7 @@ func TestObject_Insert(t *testing.T) {
 			Type:  0,
 			Value: encoding.RuneValue('a'),
 		}
-		err := node.Insert(op)
-		if err != nil {
+		if _, err := node.Apply(op); err != nil {
 			t.Fatalf("got %v; want nil", err)
 		}
 	}
@@ -66,8 +65,7 @@ func TestObject_NextValue(t *testing.T) {
 			Type:  0,
 			Value: encoding.RuneValue(r),
 		}
-		err := obj.Insert(op)
-		if err != nil {
+		if _, err := obj.Apply(op); err != nil {
 			t.Fatalf("got %v; want nil", err)
 		}
 	}
