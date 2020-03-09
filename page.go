@@ -17,7 +17,6 @@ package automerge
 import (
 	"bytes"
 	"fmt"
-
 	"github.com/savaki/automerge/encoding"
 )
 
@@ -163,6 +162,15 @@ func (p *Page) InsertAt(index int64, op Op) error {
 	p.rowCount++
 
 	return nil
+}
+
+func (p *Page) InsertAtTranslated(index int64, op Op, isDelete func(int64) bool) error {
+	translated, err := p.opType.Translate(index, isDelete)
+	if err != nil {
+		return err
+	}
+
+	return p.InsertAt(translated, op)
 }
 
 func (p *Page) SplitAt(index int64) (left, right *Page, err error) {

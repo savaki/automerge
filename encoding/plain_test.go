@@ -19,6 +19,39 @@ import (
 	"testing"
 )
 
+var got Value
+
+func BenchmarkPlain_Next(t *testing.B) {
+	const n = 1e3
+	const v = 123
+
+	p := NewPlain(RawTypeVarInt, nil)
+	for i := 0; i < n; i++ {
+		err := p.InsertAt(0, Int64Value(v))
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+
+	}
+
+	for i := 0; i < t.N; i++ {
+		var err error
+		var token PlainToken
+
+		for {
+			token, err = p.Next(token)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Fatalf("got %v; want nil", err)
+			}
+
+			got = token.Value
+		}
+	}
+}
+
 func TestPlain_InsertAt(t *testing.T) {
 	t.Run("insert empty", func(t *testing.T) {
 		p := NewPlain(RawTypeByteArray, nil)
@@ -221,39 +254,6 @@ func TestPlain_InsertAtVarInt(t *testing.T) {
 	})
 }
 
-var got Value
-
-func BenchmarkPlain_Next(t *testing.B) {
-	const n = 1e3
-	const v = 123
-
-	p := NewPlain(RawTypeVarInt, nil)
-	for i := 0; i < n; i++ {
-		err := p.InsertAt(0, Int64Value(v))
-		if err != nil {
-			t.Fatalf("got %v; want nil", err)
-		}
-
-	}
-
-	for i := 0; i < t.N; i++ {
-		var err error
-		var token PlainToken
-
-		for {
-			token, err = p.Next(token)
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				t.Fatalf("got %v; want nil", err)
-			}
-
-			got = token.Value
-		}
-	}
-}
-
 func TestPlain_SplitAt(t *testing.T) {
 	makeItem := func() *Plain {
 		base := NewPlain(RawTypeVarInt, nil)
@@ -341,6 +341,31 @@ func TestPlain_SplitAt(t *testing.T) {
 		r := readAllValues(t, right)
 		if got, want := r, 0; len(got) != want {
 			t.Fatalf("got %v; want %v", len(got), want)
+		}
+	})
+}
+
+func TestPlain_SizeRowCount(t *testing.T) {
+	makeItem := func() *Plain {
+		base := NewPlain(RawTypeVarInt, nil)
+		_ = base.InsertAt(0, Int64Value('你'))
+		_ = base.InsertAt(0, Int64Value(3))
+		_ = base.InsertAt(0, Int64Value(2))
+		_ = base.InsertAt(0, Int64Value(1))
+		return base
+	}
+
+	t.Run("size", func(t *testing.T) {
+		base := makeItem()
+		if got, want := base.Size(), 6; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+	})
+
+	t.Run("row count", func(t *testing.T) {
+		base := makeItem()
+		if got, want := base.RowCount(), 4; got != want {
+			t.Fatalf("got %v; want %v", got, want)
 		}
 	})
 }

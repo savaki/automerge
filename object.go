@@ -40,7 +40,7 @@ type objectOptions struct {
 }
 
 type location struct {
-	Offset    int64
+	Offset    int64 // Offset of location globally
 	OpIndex   int64
 	PageIndex int
 }

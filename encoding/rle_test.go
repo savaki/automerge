@@ -543,3 +543,63 @@ func readAllRLE(buffer []byte) []int64 {
 	}
 	return values
 }
+
+func TestRLE_Translate(t *testing.T) {
+	r := NewRLE(nil)
+	err := r.InsertAt(0, 0) // 0
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(1, 0) // 1
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(2, 0)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(3, 1)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(4, 0)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(5, 1)
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	err = r.InsertAt(6, 0) // 2
+	if err != nil {
+		t.Fatalf("got %v; want nil", err)
+	}
+
+	isDelete := func(v int64) bool { return v == 1 }
+
+	t.Run("no translate", func(t *testing.T) {
+		got, err := r.Translate(0, isDelete)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+		if want := int64(0); got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+	})
+
+	t.Run("captures last value", func(t *testing.T) {
+		got, err := r.Translate(2, isDelete)
+		if err != nil {
+			t.Fatalf("got %v; want nil", err)
+		}
+		if want := int64(6); got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+	})
+}

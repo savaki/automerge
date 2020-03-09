@@ -16,6 +16,7 @@ package encoding
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -322,6 +323,41 @@ func (r *RLE) SplitAt(index int64) (left, right *RLE, err error) {
 	}
 
 	return nil, nil, io.ErrUnexpectedEOF
+}
+
+// Translate returns actual index within the page for the requested element accounting
+// for deletes.
+//
+// For example, if the page consists of the operations: ins, ins, ins, del, ins
+// and we ask to translate index 2, what we should get is index 4 since we have a
+// del that would cancel out an ins.
+func (r *RLE) Translate(index int64, isDelete func(opType int64) bool) (int64, error) {
+	var (
+		deletes     int64
+		actualIndex int64
+		token       RLEToken
+		err         error
+	)
+
+	for i := int64(0); ; i++ {
+		token, err = r.Next(token)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return 0, fmt.Errorf("unable to translate index, %v: %w", index, err)
+		}
+
+		if isDelete(token.Value) {
+			deletes += 2
+		}
+
+		if index == i-deletes {
+			actualIndex = i
+		}
+	}
+
+	return actualIndex, nil
 }
 
 func rleEncode(repeat, value int64) rleBuffer {
